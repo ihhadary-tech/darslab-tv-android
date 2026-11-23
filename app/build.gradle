@@ -1,0 +1,32 @@
+// Darslab TV: one small app for Android phones, tablets, Android TV / Google TV and Amazon Fire TV.
+// It shows https://darslab.com/tv/ in a full-screen WebView; all content and sign-in live on the site.
+plugins { id "com.android.application" }
+
+def env = { String k -> System.getenv(k) ?: "" }
+def signed = env("DL_KEYSTORE_FILE") != ""     // release signing only when the build is given the upload key
+
+android {
+    namespace "com.darslab.tv"
+    compileSdk 36
+    defaultConfig {
+        applicationId "com.darslab.tv"
+        minSdk 23
+        targetSdk 36
+        versionCode((env("DL_VERSION_CODE") ?: "1") as Integer)
+        versionName "1.0"
+    }
+    signingConfigs {
+        if (signed) release {
+            storeFile file(env("DL_KEYSTORE_FILE")); storePassword env("DL_KEYSTORE_PASS")
+            keyAlias env("DL_KEY_ALIAS"); keyPassword env("DL_KEY_PASS")
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (signed) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    lint { abortOnError false }
+}

@@ -1,0 +1,40 @@
+# Builds the Darslab TV Android app (phones, Android TV / Google TV, Fire TV).
+# Always: a test APK to install by hand. With the upload-key secrets set: a signed .aab for Google Play and a signed APK for Amazon.
+name: Darslab TV Android app
+on:
+  workflow_dispatch:
+  push:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.11.1" }
+      - name: Android platform 36
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0" > /dev/null || true
+      - name: Test APK
+        working-directory: .
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Signed release (only when the upload key is set)
+        working-directory: .
+        env:
+          KEYSTORE_B64: ${{ secrets.DL_KEYSTORE_B64 }}
+          DL_KEYSTORE_PASS: ${{ secrets.DL_KEYSTORE_PASS }}
+          DL_KEY_ALIAS: ${{ secrets.DL_KEY_ALIAS }}
+          DL_KEY_PASS: ${{ secrets.DL_KEY_PASS }}
+          DL_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then echo "No upload key in the repository secrets: test APK only."; exit 0; fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          DL_KEYSTORE_FILE="$RUNNER_TEMP/upload.jks" gradle --no-daemon :app:bundleRelease :app:assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darslab-tv-android
+          path: |
+            app/build/outputs/apk/**/*.apk
+            app/build/outputs/bundle/**/*.aab
